@@ -1,0 +1,2398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#14161a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Penplot" />
+<meta name="mobile-web-app-capable" content="yes" />
+<title>Penplot — SVG line-draw studio</title>
+<style>
+  :root{
+    --bg-app: #14161a;
+    --bg-panel: #1b1e24;
+    --bg-panel-alt: #21252c;
+    --bg-input: #262b33;
+    --border: #2c313a;
+    --border-soft: rgba(255,255,255,0.07);
+    --text: #eae7e1;
+    --text-muted: #8b909c;
+    --text-faint: #5b606b;
+    --accent: #eba039;
+    --accent-strong: #f6bc5f;
+    --accent-soft: rgba(235,160,57,0.16);
+    --danger: #e0645a;
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  *, *::before, *::after{ box-sizing: border-box; }
+  html, body{ height:100%; margin:0; }
+  body{
+    font-family: var(--sans);
+    background: var(--bg-app);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  h1,h2,p{ margin:0; }
+  button{ font-family: inherit; }
+  *:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- layout ---------- */
+  .app{ display:flex; height:100vh; width:100vw; }
+
+  .sidebar{
+    width: 322px;
+    flex-shrink: 0;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 22px 20px 18px;
+    display:flex;
+    flex-direction: column;
+  }
+  .sidebar::-webkit-scrollbar{ width:8px; }
+  .sidebar::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+
+  .brand{ display:flex; align-items:flex-start; gap:11px; margin-bottom:6px; }
+  .brand .mark{ width:30px; height:30px; flex-shrink:0; color: var(--accent); margin-top:1px; }
+  .brand h1{ font-size:17px; font-weight:650; letter-spacing:0.1px; }
+  .tagline{ font-size:12.5px; color: var(--text-muted); margin-top:2px; line-height:1.4; }
+
+  .panel{ padding: 17px 0; border-top: 1px solid var(--border-soft); }
+  .panel:first-of-type{ border-top:none; }
+  .panel-title{ font-size:12px; font-weight:650; color: var(--text-muted); margin-bottom:11px; }
+
+  /* ---------- dropzone / upload ---------- */
+  .dropzone{
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px 14px;
+    text-align:center;
+    cursor:pointer;
+    transition: border-color .18s ease, background-color .18s ease;
+    background: var(--bg-panel-alt);
+  }
+  .dropzone:hover, .dropzone:focus-visible{ border-color: var(--text-faint); }
+  .dropzone.drag-over{ border-color: var(--accent); background: var(--accent-soft); }
+  .dropzone svg{ width:22px; height:22px; color: var(--text-faint); margin-bottom:8px; }
+  .dropzone p{ font-size:13px; color: var(--text-muted); }
+  .dropzone .or{ font-size:11px; color: var(--text-faint); margin:8px 0; }
+
+  .file-info{
+    margin-top:12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background: var(--bg-panel-alt);
+    border:1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding:9px 10px;
+    font-size:12.5px;
+  }
+  .file-dot{ width:7px; height:7px; border-radius:50%; background: var(--accent); flex-shrink:0; }
+  .file-text{ flex:1; min-width:0; }
+  #fileName{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .file-meta{ display:block; color: var(--text-faint); font-size:11px; margin-top:1px; }
+  .btn-text{
+    background:none; border:none; color: var(--text-faint); font-size:11.5px;
+    cursor:pointer; text-decoration: underline; text-underline-offset:2px; padding:2px;
+  }
+  .btn-text:hover{ color: var(--danger); }
+
+  .error-text{ margin-top:10px; font-size:12px; color: var(--danger); line-height:1.4; }
+
+  /* ---------- buttons ---------- */
+  .btn-row{ display:flex; gap:8px; }
+  .btn{
+    flex:1;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size:13px;
+    font-weight:550;
+    padding: 9px 8px;
+    border-radius: var(--radius-sm);
+    cursor:pointer;
+    transition: background-color .15s ease, border-color .15s ease, opacity .15s ease;
+  }
+  .btn svg{ width:14px; height:14px; }
+  .btn:hover:not(:disabled){ border-color: var(--text-faint); }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+  .btn-primary{ background: var(--accent); border-color: var(--accent); color:#20160a; }
+  .btn-primary:hover:not(:disabled){ background: var(--accent-strong); border-color: var(--accent-strong); }
+  .btn-ghost{ background:transparent; border:1px solid var(--border); color: var(--text); width:100%; }
+  .btn-outline{ background:transparent; border:1px solid var(--border); color: var(--text); width:100%; }
+  .btn-outline:hover{ border-color: var(--accent); color: var(--accent-strong); }
+
+  /* ---------- mobile / touch ---------- */
+  html{ -webkit-text-size-adjust:100%; }
+  button, input{ touch-action: manipulation; }
+  .btn, .seg-btn, .btn-text, .dropzone{ -webkit-tap-highlight-color: transparent; }
+  .btn, .seg-btn{ min-height:42px; }
+
+  .progress-track{
+    margin-top:12px; height:4px; border-radius:2px; background: var(--bg-input); overflow:hidden;
+  }
+  .progress-fill{ height:100%; width:0%; background: var(--accent); border-radius:2px; }
+
+  /* ---------- speed ---------- */
+  .speed-row{ display:flex; align-items:center; gap:10px; }
+  .speed-row span{ font-size:11px; color: var(--text-faint); flex-shrink:0; }
+  input[type="range"]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:3px; background: var(--bg-input); border-radius:2px; outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
+    background: var(--accent); cursor:pointer; border:2px solid #14161a;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:15px; height:15px; border-radius:50%; background: var(--accent); border:2px solid #14161a; cursor:pointer;
+  }
+  .speed-readout{ margin-top:9px; font-family: var(--mono); font-size:12px; color: var(--text-muted); }
+  .speed-readout span{ color: var(--text); }
+
+  /* ---------- segmented control ---------- */
+  .segmented{ display:flex; border:1px solid var(--border); border-radius: var(--radius-sm); overflow:hidden; }
+  .seg-btn{
+    flex:1; background: var(--bg-input); border:none; color: var(--text-muted);
+    font-size:12.5px; padding:8px 6px; cursor:pointer; border-right:1px solid var(--border);
+    transition: background-color .15s ease, color .15s ease;
+  }
+  .seg-btn:last-child{ border-right:none; }
+  .seg-btn:hover{ color: var(--text); }
+  .seg-btn.active{ background: var(--accent-soft); color: var(--accent-strong); font-weight:600; }
+
+  .custom-bg-controls{ display:none; margin-top:10px; padding:10px; background:var(--bg-panel-alt); border:1px solid var(--border); border-radius:var(--radius-sm); }
+  .custom-bg-controls.visible{ display:block; }
+  .custom-bg-row{ display:flex; align-items:center; gap:10px; }
+  .color-picker{ width:48px; height:38px; padding:3px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input); cursor:pointer; }
+  .hex-input{ flex:1; min-width:0; height:38px; padding:0 10px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input); color:var(--text); font-family:var(--mono); font-size:12px; text-transform:uppercase; }
+  .hue-range{ margin-top:10px !important; }
+  .custom-bg-label{ font-size:11px; color:var(--text-faint); margin-bottom:7px; }
+
+  .segmented-spaced{ margin-top:10px; }
+
+  .chip-group{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    background: var(--bg-input); border:1px solid var(--border); color: var(--text-muted);
+    font-size:12px; padding:7px 12px; border-radius:999px; cursor:pointer;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+  }
+  .chip:hover{ color: var(--text); border-color: var(--text-faint); }
+  .chip.active{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); font-weight:600; }
+
+  .stack{ margin-top:12px; }
+
+  .batch-list{ margin-top:12px; display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto; }
+  .batch-item{
+    display:flex; align-items:center; gap:8px;
+    background: var(--bg-panel-alt); border:1px solid var(--border); border-radius: var(--radius-sm);
+    padding:7px 10px; font-size:12px;
+  }
+  .batch-name{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .batch-status{ flex-shrink:0; font-size:11px; color: var(--text-faint); }
+  .batch-item.status-processing .batch-status{ color: var(--accent-strong); }
+  .batch-item.status-done .batch-status{ color: #8fe3b8; }
+  .batch-item.status-error .batch-status{ color: var(--danger); }
+  .batch-item-remove{
+    background:none; border:none; color: var(--text-faint); cursor:pointer; font-size:13px; padding:2px 4px; flex-shrink:0; line-height:1;
+  }
+  .batch-item-remove:hover{ color: var(--danger); }
+
+  .overlay-img{
+    position:absolute;
+    display:none;
+    pointer-events:none;
+    object-fit:contain;
+    opacity:0;
+    transition: opacity .3s ease;
+  }
+  .overlay-img.visible{ opacity:1; }
+
+  .hint{ margin-top:9px; font-size:11.5px; color: var(--text-faint); }
+
+  .switch-row{ display:flex; align-items:center; gap:10px; margin-top:14px; cursor:pointer; font-size:12.5px; color: var(--text); }
+  .switch{ position:relative; width:36px; height:20px; flex-shrink:0; }
+  .switch input{ position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; }
+  .switch-track{ position:absolute; inset:0; background: var(--bg-input); border:1px solid var(--border); border-radius:999px; transition: background-color .15s ease, border-color .15s ease; }
+  .switch-thumb{ position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background: var(--text-faint); transition: transform .15s ease, background-color .15s ease; }
+  .switch input:checked + .switch-track{ background: var(--accent-soft); border-color: var(--accent); }
+  .switch input:checked + .switch-track .switch-thumb{ transform: translateX(16px); background: var(--accent); }
+  .switch input:focus-visible + .switch-track{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .sidebar-footer{ margin-top:auto; padding-top:18px; }
+  .sidebar-footer p{ font-size:11px; color: var(--text-faint); line-height:1.5; }
+
+  /* ---------- stage ---------- */
+  .stage{
+    flex:1; position:relative; display:flex; align-items:center; justify-content:center;
+    padding: 38px; min-width:0;
+  }
+  .stage-inner{ position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+
+  .corner-mark{ position:absolute; width:22px; height:22px; color: var(--text-faint); opacity:.55; transition:opacity .2s ease; }
+  .corner-mark.tl{ top:0; left:0; }
+  .corner-mark.tr{ top:0; right:0; }
+  .corner-mark.bl{ bottom:0; left:0; }
+  .corner-mark.br{ bottom:0; right:0; }
+
+  .canvas-wrap{
+    position:relative;
+    width:100%; height:100%;
+    max-width: 980px; max-height: 760px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    overflow:hidden;
+    transition: background-color .25s ease, border-color .18s ease;
+  }
+  .canvas-wrap.drag-over{ border-color: var(--accent); }
+  .canvas-wrap.bg-white{ background:#ffffff; }
+  .canvas-wrap.bg-grid{
+    background-color:#1c1f24;
+    background-image:
+      linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  .canvas-wrap.bg-transparent{
+    background-color:#26282d;
+    background-image:
+      linear-gradient(45deg,#3a3d44 25%,transparent 25%),
+      linear-gradient(-45deg,#3a3d44 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#3a3d44 75%),
+      linear-gradient(-45deg,transparent 75%,#3a3d44 75%);
+    background-size: 22px 22px;
+    background-position: 0 0, 0 11px, 11px -11px, -11px 0px;
+  }
+
+  .empty-state{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px; color: var(--text-faint); text-align:center; padding:24px; pointer-events:none;
+  }
+  .empty-state svg{ width:30px; height:30px; margin-bottom:4px; opacity:.7; }
+  .empty-state p{ font-size:13px; }
+
+  .recording-banner{
+    position:absolute; top:18px; left:50%; transform:translateX(-50%);
+    z-index:20; display:none; align-items:center; gap:8px;
+    background:rgba(115,24,20,.96); border:1px solid rgba(255,150,140,.45);
+    color:#fff; font-size:12.5px; font-weight:650; line-height:1.2;
+    padding:10px 15px; border-radius:999px; box-shadow:0 8px 24px rgba(0,0,0,.28);
+    pointer-events:auto; white-space:nowrap;
+  }
+  .recording-banner.visible{ display:flex; }
+  .recording-cancel{
+    appearance:none; -webkit-appearance:none;
+    border:1px solid rgba(255,255,255,.48);
+    background:rgba(255,255,255,.12); color:#fff;
+    font:inherit; font-size:12px; font-weight:700;
+    padding:6px 10px; border-radius:999px;
+    cursor:pointer; touch-action:manipulation;
+  }
+  .recording-cancel:hover{ background:rgba(255,255,255,.2); }
+  .recording-cancel:active{ transform:translateY(1px); }
+  .recording-cancel:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+  .recording-dot{
+    width:8px; height:8px; border-radius:50%; background:#ff5f56;
+    box-shadow:0 0 0 3px rgba(255,95,86,.18); flex-shrink:0;
+    animation:recordPulse 1s ease-in-out infinite;
+  }
+  @keyframes recordPulse{ 50%{ opacity:.45; transform:scale(.82); } }
+
+  .video-ready-banner{
+    position:absolute; top:18px; left:50%; transform:translateX(-50%);
+    z-index:20; display:none; align-items:center; gap:8px;
+    background:rgba(20,58,42,.96); border:1px solid rgba(140,230,180,.4);
+    color:#eafff2; font-size:12.5px; font-weight:650; line-height:1.2;
+    padding:10px 12px 10px 15px; border-radius:999px; box-shadow:0 8px 24px rgba(0,0,0,.28);
+    pointer-events:auto; white-space:nowrap;
+  }
+  .video-ready-banner.visible{ display:flex; }
+  .video-ready-icon{ font-size:14px; line-height:1; }
+  .video-ready-save{
+    appearance:none; -webkit-appearance:none;
+    border:1px solid rgba(255,255,255,.5);
+    background:rgba(255,255,255,.14); color:#fff;
+    font:inherit; font-size:12px; font-weight:700;
+    padding:6px 12px; border-radius:999px;
+    cursor:pointer; touch-action:manipulation;
+  }
+  .video-ready-save:hover{ background:rgba(255,255,255,.24); }
+  .video-ready-save:active{ transform:translateY(1px); }
+  .video-ready-save:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+  .video-ready-dismiss{
+    appearance:none; -webkit-appearance:none;
+    border:none; background:transparent; color:rgba(255,255,255,.7);
+    font-size:15px; line-height:1; padding:4px 6px; cursor:pointer; touch-action:manipulation;
+  }
+  .video-ready-dismiss:hover{ color:#fff; }
+  .video-ready-dismiss:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+
+  .canvas-wrap.bg-white .empty-state{ color:#b7b3ab; }
+
+  .svg-host{ width:90%; height:90%; display:flex; align-items:center; justify-content:center; }
+  .svg-host svg{ width:100%; height:100%; }
+
+  /* ---------- clean / presentation view ---------- */
+  .app.clean-view .sidebar{ display:none; }
+  .app.clean-view .stage{ padding:0; }
+  .app.clean-view .corner-mark{ opacity:0; }
+  .app.clean-view .canvas-wrap{ border:none; border-radius:0; max-width:none; max-height:none; }
+
+  .exit-clean{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background: rgba(20,22,26,0.85); border:1px solid var(--border); color: var(--text);
+    font-size:12.5px; padding:9px 16px; border-radius: 999px; cursor:pointer;
+    opacity:0; pointer-events:none; transition: opacity .35s ease;
+    backdrop-filter: blur(6px);
+  }
+  .exit-clean.visible{ opacity:1; pointer-events:auto; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 860px){
+    html, body{ min-height:100%; height:auto; }
+    body{ overflow:auto; }
+
+    .app{ flex-direction:column; min-height:100dvh; height:auto; }
+    .sidebar{
+      width:100%;
+      max-height:none;
+      border-right:none;
+      border-bottom:1px solid var(--border);
+      padding:18px 16px 14px;
+      overflow:visible;
+    }
+
+    .stage{
+      min-height:calc(100dvh - 1px);
+      height:auto;
+      padding:14px;
+      align-items:stretch;
+    }
+
+    .stage-inner{
+      min-height:68vh;
+      height:68vh;
+    }
+
+    .canvas-wrap{
+      width:100%;
+      height:100%;
+      min-height:320px;
+      max-width:none;
+      max-height:none;
+    }
+
+    .recording-banner{
+      top:10px;
+      max-width:calc(100% - 20px);
+      white-space:normal;
+      text-align:center;
+      justify-content:center;
+      border-radius:12px;
+      padding:10px 12px;
+    }
+    .recording-cancel{ padding:6px 9px; }
+
+    .video-ready-banner{
+      top:10px;
+      max-width:calc(100% - 20px);
+      white-space:normal;
+      text-align:center;
+      justify-content:center;
+      border-radius:12px;
+      padding:10px 12px;
+    }
+    .video-ready-save{ padding:6px 10px; }
+
+    .empty-state{ padding:18px; }
+    .empty-state p{ font-size:14px; }
+
+    .dropzone{ padding:18px 12px; }
+    .btn, .seg-btn{ min-height:44px; }
+    .btn-text{ min-height:38px; padding:8px; }
+
+    .sidebar-footer{ margin-top:6px; }
+  }
+
+  @media (max-width: 520px){
+    .sidebar{ padding:14px 12px 12px; }
+    .brand h1{ font-size:16px; }
+    .tagline{ font-size:12px; }
+
+    .panel{ padding:14px 0; }
+    .panel-title{ margin-bottom:9px; }
+
+    .btn-row{ gap:6px; }
+    .btn{ font-size:12.5px; padding-left:5px; padding-right:5px; }
+    .segmented{ flex-wrap:wrap; }
+    .seg-btn{ flex:1 1 25%; }
+
+    .stage{ padding:10px; }
+    .stage-inner{ min-height:58vh; height:58vh; }
+    .canvas-wrap{ min-height:280px; }
+
+    .exit-clean{ bottom:14px; font-size:12px; padding:9px 13px; }
+  }
+
+  @media (max-width: 380px){
+    .btn-row{ flex-wrap:wrap; }
+    .btn-row .btn{ min-width:calc(50% - 3px); }
+    .btn-row .btn:last-child{ flex-basis:100%; }
+
+    .stage-inner{ min-height:54vh; height:54vh; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .dropzone, .btn, .seg-btn, .chip, .exit-clean, .canvas-wrap, .overlay-img{ transition:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 20 L15 9 L18 12 L7 23 Z" />
+        <path d="M15 9 L18 3 L21 6 L18 12 Z" />
+        <path d="M4 20 L2 22" />
+      </svg>
+      <div>
+        <h1>Penplot</h1>
+        <p class="tagline">Draw your SVG, stroke by stroke.</p>
+      </div>
+    </div>
+
+    <section class="panel">
+      <h2 class="panel-title">Upload artwork</h2>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload an SVG file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V4M12 4L7 9M12 4l5 5" />
+          <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+        </svg>
+        <p>Drop an .svg file here</p>
+        <p class="or">or</p>
+        <button type="button" class="btn btn-ghost" id="browseBtn">Browse files</button>
+        <input type="file" id="fileInput" accept=".svg,image/svg+xml" hidden />
+      </div>
+
+      <div class="file-info" id="fileInfo" hidden>
+        <span class="file-dot"></span>
+        <span class="file-text">
+          <span id="fileName"></span>
+          <span class="file-meta" id="fileMeta"></span>
+        </span>
+        <button type="button" class="btn-text" id="clearBtn">Remove</button>
+      </div>
+
+      <p class="error-text" id="errorText" hidden></p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Playback</h2>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" id="playBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Play
+        </button>
+        <button type="button" class="btn" id="pauseBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+          Pause
+        </button>
+        <button type="button" class="btn" id="resetBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+          Reset
+        </button>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Ending</h2>
+      <div class="speed-row">
+        <span>0s</span>
+        <input type="range" id="holdSlider" min="0" max="5000" step="100" value="1000" aria-label="Hold duration on the finished drawing" />
+        <span>5s</span>
+      </div>
+      <div class="speed-readout"><span id="holdValue">1.0</span>s hold</div>
+
+      <div class="segmented segmented-spaced" id="endModeToggle">
+        <button type="button" class="seg-btn active" data-end="stop">Stop</button>
+        <button type="button" class="seg-btn" data-end="fade">Fade out</button>
+        <button type="button" class="seg-btn" data-end="undraw">Un-draw</button>
+      </div>
+      <p class="hint">How long the finished drawing is held before a loop restarts or an export stops — and what happens right after. "Fade out" and "Un-draw" make the ending loop back to blank seamlessly, which is what an exported video will do too.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Export format</h2>
+      <div class="chip-group" id="aspectToggle">
+        <button type="button" class="chip active" data-aspect="auto">Auto</button>
+        <button type="button" class="chip" data-aspect="1:1">1:1</button>
+        <button type="button" class="chip" data-aspect="4:5">4:5</button>
+        <button type="button" class="chip" data-aspect="9:16">9:16</button>
+        <button type="button" class="chip" data-aspect="16:9">16:9</button>
+      </div>
+      <p class="hint">"Auto" matches the canvas as shown on screen. A fixed ratio adds padding around the artwork so the exported video comes out exactly that shape — 9:16 for Stories/Reels, 1:1 or 4:5 for the feed, 16:9 for widescreen.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Video export</h2>
+      <button type="button" class="btn btn-primary" id="exportBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/>
+        </svg>
+        Export MP4
+      </button>
+      <p class="hint">Records the animation in real time as MP4 when supported, otherwise WebM. Once it's done, a "Video ready" banner lets you save or share it with one tap.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Batch export</h2>
+      <button type="button" class="btn btn-ghost" id="batchAddBtn">Add SVG files</button>
+      <input type="file" id="batchFileInput" accept=".svg,image/svg+xml" multiple hidden />
+
+      <div class="batch-list" id="batchList" hidden></div>
+
+      <div class="btn-row stack">
+        <button type="button" class="btn btn-primary" id="batchStartBtn" disabled>Start batch</button>
+        <button type="button" class="btn" id="batchClearBtn" disabled>Clear</button>
+      </div>
+      <p class="hint" id="batchProgressText"></p>
+      <p class="hint">Exports every queued file, one after another, using the current Ending, Export format, Overlay and Pen tip settings. Each video downloads straight to your browser's downloads folder — it may ask once to allow multiple downloads.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Speed</h2>
+      <div class="speed-row">
+        <span>Slow</span>
+        <input type="range" id="speedSlider" min="0.25" max="3" step="0.05" value="1" aria-label="Animation speed" />
+        <span>Fast</span>
+      </div>
+      <div class="speed-readout"><span id="speedValue">1.00</span>×</div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Pen tip</h2>
+      <label class="switch-row" for="penDotToggle">
+        <span class="switch">
+          <input type="checkbox" id="penDotToggle" />
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </span>
+        <span>Show a dot at the drawing tip</span>
+      </label>
+      <p class="hint">A small marker that follows the exact point being drawn — including while "Un-draw" plays in reverse. Shows in the video export too, since it's drawn as part of the artwork itself.</p>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Canvas background</h2>
+      <div class="segmented" id="bgToggle">
+        <button type="button" class="seg-btn active" data-bg="white">White</button>
+        <button type="button" class="seg-btn" data-bg="grid">Grid</button>
+        <button type="button" class="seg-btn" data-bg="transparent">Transparent</button>
+        <button type="button" class="seg-btn" data-bg="custom">Custom</button>
+      </div>
+      <div class="custom-bg-controls" id="customBgControls">
+        <div class="custom-bg-label">Choose a color or enter a HEX value</div>
+        <div class="custom-bg-row">
+          <input type="color" class="color-picker" id="customColorPicker" value="#2A2D33" aria-label="Custom background color" />
+          <input type="text" class="hex-input" id="customHexInput" value="#2A2D33" maxlength="7" inputmode="text" spellcheck="false" aria-label="Custom background HEX color" />
+        </div>
+        <input type="range" class="hue-range" id="customHueSlider" min="0" max="360" step="1" value="210" aria-label="Background hue" />
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Overlay</h2>
+      <label class="switch-row" for="overlayToggle">
+        <span class="switch">
+          <input type="checkbox" id="overlayToggle" />
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </span>
+        <span>Show a logo or QR code</span>
+      </label>
+
+      <div id="overlayControls" hidden>
+        <button type="button" class="btn btn-ghost stack" id="overlayBrowseBtn">Choose image</button>
+        <input type="file" id="overlayFileInput" accept="image/*" hidden />
+
+        <div class="file-info" id="overlayFileInfo" hidden>
+          <span class="file-dot"></span>
+          <span class="file-text"><span id="overlayFileName"></span></span>
+          <button type="button" class="btn-text" id="overlayClearBtn">Remove</button>
+        </div>
+        <p class="error-text" id="overlayErrorText" hidden></p>
+
+        <div class="chip-group stack" id="overlayPositionToggle">
+          <button type="button" class="chip" data-pos="top-left">Top-left</button>
+          <button type="button" class="chip" data-pos="top-right">Top-right</button>
+          <button type="button" class="chip active" data-pos="bottom-right">Bottom-right</button>
+          <button type="button" class="chip" data-pos="bottom-left">Bottom-left</button>
+          <button type="button" class="chip" data-pos="center">Center</button>
+        </div>
+
+        <div class="speed-row stack">
+          <span>Small</span>
+          <input type="range" id="overlaySizeSlider" min="6" max="30" step="1" value="14" aria-label="Overlay size" />
+          <span>Large</span>
+        </div>
+        <div class="speed-readout"><span id="overlaySizeValue">14</span>% of width</div>
+
+        <div class="segmented segmented-spaced" id="overlayTimingToggle">
+          <button type="button" class="seg-btn active" data-timing="always">Always visible</button>
+          <button type="button" class="seg-btn" data-timing="end">Only at the end</button>
+        </div>
+        <p class="hint">"Only at the end" fades it in once the drawing is finished — handy for a QR code you only want people to scan once the piece is complete. Works the same in a video export.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title">Presentation</h2>
+      <button type="button" class="btn btn-outline" id="cleanViewBtn">Enter clean view</button>
+      <p class="hint">Hides every control for screen recording. Press Esc to return. Tap the artwork in clean view to replay it from the start.</p>
+
+      <label class="switch-row" for="loopToggle">
+        <span class="switch">
+          <input type="checkbox" id="loopToggle" />
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </span>
+        <span>Auto-loop</span>
+      </label>
+      <p class="hint">For an unattended stall screen — plays on repeat. Never affects video exports, which always play through exactly once.</p>
+    </section>
+
+    <div class="sidebar-footer">
+      <p>Everything runs locally in your browser — files never leave your machine.</p>
+    </div>
+  </aside>
+
+  <main class="stage" id="stage">
+    <div class="stage-inner">
+      <svg class="corner-mark tl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 9V2h7"/></svg>
+      <svg class="corner-mark tr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 9V2h-7"/></svg>
+      <svg class="corner-mark bl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 15v7h7"/></svg>
+      <svg class="corner-mark br" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M22 15v7h-7"/></svg>
+
+      <div class="canvas-wrap bg-white" id="canvasWrap">
+        <div class="recording-banner" id="recordingBanner" role="status" aria-live="polite">
+          <span class="recording-dot"></span>
+          <span>Recording video in progress...</span>
+          <button type="button" class="recording-cancel" id="recordingCancelBtn">Cancel</button>
+        </div>
+        <div class="video-ready-banner" id="videoReadyBanner" role="status" aria-live="polite">
+          <span class="video-ready-icon" aria-hidden="true">🎬</span>
+          <span>Video ready</span>
+          <button type="button" class="video-ready-save" id="videoReadySaveBtn">Save video</button>
+          <button type="button" class="video-ready-dismiss" id="videoReadyDismissBtn" aria-label="Discard video">✕</button>
+        </div>
+        <div class="empty-state" id="emptyState">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l6-11 4 7 3-4 3 8H4z"/></svg>
+          <p>Load an SVG to begin</p>
+        </div>
+        <div class="svg-host" id="svgHost"></div>
+        <img id="overlayImg" class="overlay-img" alt="" />
+      </div>
+    </div>
+    <button type="button" class="exit-clean" id="exitCleanBtn">Exit clean view (Esc)</button>
+  </main>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- element references ---------------- */
+  var appEl        = document.getElementById('app');
+  var sidebar      = document.getElementById('sidebar');
+  var stage        = document.getElementById('stage');
+  var dropzone     = document.getElementById('dropzone');
+  var fileInput    = document.getElementById('fileInput');
+  var browseBtn    = document.getElementById('browseBtn');
+  var fileInfo     = document.getElementById('fileInfo');
+  var fileNameEl   = document.getElementById('fileName');
+  var fileMetaEl   = document.getElementById('fileMeta');
+  var clearBtn     = document.getElementById('clearBtn');
+  var errorText    = document.getElementById('errorText');
+
+  var playBtn      = document.getElementById('playBtn');
+  var pauseBtn     = document.getElementById('pauseBtn');
+  var resetBtn     = document.getElementById('resetBtn');
+  var progressFill = document.getElementById('progressFill');
+
+  var speedSlider  = document.getElementById('speedSlider');
+  var holdSlider   = document.getElementById('holdSlider');
+  var holdValue    = document.getElementById('holdValue');
+  var endModeToggle = document.getElementById('endModeToggle');
+  var aspectToggle = document.getElementById('aspectToggle');
+
+  var overlayToggle = document.getElementById('overlayToggle');
+  var overlayControls = document.getElementById('overlayControls');
+  var overlayBrowseBtn = document.getElementById('overlayBrowseBtn');
+  var overlayFileInput = document.getElementById('overlayFileInput');
+  var overlayFileInfo = document.getElementById('overlayFileInfo');
+  var overlayFileName = document.getElementById('overlayFileName');
+  var overlayClearBtn = document.getElementById('overlayClearBtn');
+  var overlayErrorText = document.getElementById('overlayErrorText');
+  var overlayPositionToggle = document.getElementById('overlayPositionToggle');
+  var overlaySizeSlider = document.getElementById('overlaySizeSlider');
+  var overlaySizeValue = document.getElementById('overlaySizeValue');
+  var overlayTimingToggle = document.getElementById('overlayTimingToggle');
+  var overlayImg = document.getElementById('overlayImg');
+  var penDotToggle = document.getElementById('penDotToggle');
+
+  var batchAddBtn = document.getElementById('batchAddBtn');
+  var batchFileInput = document.getElementById('batchFileInput');
+  var batchList = document.getElementById('batchList');
+  var batchStartBtn = document.getElementById('batchStartBtn');
+  var batchClearBtn = document.getElementById('batchClearBtn');
+  var batchProgressText = document.getElementById('batchProgressText');
+  var speedValue   = document.getElementById('speedValue');
+
+  var bgToggle     = document.getElementById('bgToggle');
+  var customBgControls = document.getElementById('customBgControls');
+  var customColorPicker = document.getElementById('customColorPicker');
+  var customHexInput = document.getElementById('customHexInput');
+  var customHueSlider = document.getElementById('customHueSlider');
+  var customBgColor = customColorPicker.value;
+  var canvasWrap   = document.getElementById('canvasWrap');
+  var emptyState   = document.getElementById('emptyState');
+  var svgHost      = document.getElementById('svgHost');
+  var recordingBanner = document.getElementById('recordingBanner');
+  var recordingCancelBtn = document.getElementById('recordingCancelBtn');
+  var videoReadyBanner = document.getElementById('videoReadyBanner');
+  var videoReadySaveBtn = document.getElementById('videoReadySaveBtn');
+  var videoReadyDismissBtn = document.getElementById('videoReadyDismissBtn');
+
+  var cleanViewBtn = document.getElementById('cleanViewBtn');
+  var loopToggle = document.getElementById('loopToggle');
+  var exitCleanBtn = document.getElementById('exitCleanBtn');
+
+  /* ---------------- timeline engine ---------------- */
+  var MIN_ELEM_MS   = 220;
+  var MAX_ELEM_MS   = 1800;
+  var MS_PER_UNIT   = 2.6;
+  var FILL_FADE_MS  = 380;
+  var FILLONLY_MS   = 420;
+  var OVERLAP_RATIO = 0.18;
+  var MAX_OVERLAP   = 140;
+
+  var svgEl = null;
+  var items = [];
+  var totalDuration = 0;
+  var playing = false;
+  var finished = false;
+  var timelinePos = 0;
+  var lastTs = null;
+  var rafId = null;
+  var speed = 1;
+
+  /* ---------------- video recording ---------------- */
+  var recording = false;
+  var mediaRecorder = null;
+  var recordingChunks = [];
+  var recordingCanvas = null;
+  var recordingCtx = null;
+  var recordingStream = null;
+  var recordingMime = '';
+  var recordingExtension = 'webm';
+  var recordingFrameBusy = false;
+  var recordingStopRequested = false;
+  var recordingCancelRequested = false;
+  var recordingFailRequested = false;
+  var recordingStopResolve = null;
+  var recordingStopReject = null;
+
+  /* A finished recording waiting on a fresh user click before it is saved or
+     shared — showSaveFilePicker()/navigator.share() require "live" user
+     activation, which the original Export click no longer carries by the
+     time a long recording finishes. */
+  var pendingVideoBlob = null;
+  var pendingVideoFilename = '';
+  var pendingVideoMime = '';
+  var pendingVideoExtension = 'webm';
+
+  /* Auto-loop is a live-viewing convenience (e.g. a screen at a market stall)
+     and never affects recording — a video export always plays through once. */
+  var loopEnabled = false;
+
+  /* "Ending" behaviour: how long the finished drawing is held on screen, and
+     what happens after that hold — before a loop restarts or an export stops.
+     This runs identically for live playback and for recording, so an export
+     naturally contains the hold/fade/undraw and can loop seamlessly. */
+  var holdMs = 1000;
+  var endMode = 'stop'; // 'stop' | 'fade' | 'undraw'
+  var exportAspect = 'auto'; // 'auto' | '1:1' | '4:5' | '9:16' | '16:9'
+
+  /* Overlay (logo / QR code) — a viewer-supplied image, never generated by
+     the tool. Positioned as a percentage of the canvas so the same numbers
+     work identically on screen and inside a recorded video, whatever export
+     aspect ratio is chosen. */
+  var overlayEnabled = false;
+  var overlayLoaded = false;
+  var overlayPosition = 'bottom-right'; // 'top-left'|'top-right'|'bottom-left'|'bottom-right'|'center'
+  var overlaySizePct = 14;
+  var overlayTiming = 'always'; // 'always' | 'end'
+  var OVERLAY_MARGIN_PCT = 0.04;
+
+  /* Pen-tip dot — implemented as a real <circle> living inside the artwork's
+     own SVG tree (not an HTML overlay), so it automatically appears, at the
+     correct position, in both the live preview and the recorded video with
+     no separate export-side code. */
+  var penDotEnabled = false;
+  var penDotEl = null;
+
+  /* Batch export — queues several files and re-runs the existing single-file
+     export flow for each in turn. Each finished video downloads directly
+     (no native save dialog), since showSaveFilePicker()/navigator.share()
+     need a fresh click we won't have partway through an automated queue. */
+  var batchQueue = []; // { file, status: 'queued'|'processing'|'done'|'error', errorMsg }
+  var batchRunning = false;
+  var batchIndex = -1;
+  var FADE_OUTRO_MS = 500;
+  var animPhase = 'draw'; // 'draw' | 'hold' | 'outro-fade' | 'outro-undraw' | 'done'
+  var phaseElapsed = 0;
+
+  function resetPhase(){
+    animPhase = 'draw';
+    phaseElapsed = 0;
+    if (svgEl) svgEl.style.opacity = '';
+  }
+
+  function enterOutroOrDone(){
+    if (endMode === 'fade'){
+      animPhase = 'outro-fade';
+      phaseElapsed = 0;
+    } else if (endMode === 'undraw'){
+      animPhase = 'outro-undraw';
+    } else {
+      animPhase = 'done';
+    }
+  }
+
+  function advancePhase(dt){
+    if (animPhase === 'draw'){
+      timelinePos += dt * speed;
+      if (timelinePos >= totalDuration){
+        timelinePos = totalDuration;
+        if (holdMs > 0){
+          animPhase = 'hold';
+          phaseElapsed = 0;
+        } else {
+          enterOutroOrDone();
+        }
+      }
+    } else if (animPhase === 'hold'){
+      phaseElapsed += dt;
+      if (phaseElapsed >= holdMs) enterOutroOrDone();
+    } else if (animPhase === 'outro-fade'){
+      phaseElapsed += dt;
+      var ft = clamp(phaseElapsed / FADE_OUTRO_MS, 0, 1);
+      if (svgEl) svgEl.style.opacity = String(1 - ft);
+      if (phaseElapsed >= FADE_OUTRO_MS){
+        timelinePos = 0;
+        if (svgEl) svgEl.style.opacity = '';
+        animPhase = 'done';
+      }
+    } else if (animPhase === 'outro-undraw'){
+      timelinePos -= dt * speed;
+      if (timelinePos <= 0){
+        timelinePos = 0;
+        animPhase = 'done';
+      }
+    }
+  }
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  function easeInOutCubic(t){ return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2; }
+
+  function isInsideDef(el){
+    return !!el.closest('defs, clipPath, mask, symbol, pattern, marker');
+  }
+
+  function buildTimeline(root){
+    items = [];
+    var candidates = root.querySelectorAll('path, line, polyline, polygon, circle, ellipse, rect');
+
+    for (var i = 0; i < candidates.length; i++){
+      var el = candidates[i];
+      if (isInsideDef(el)) continue;
+
+      var style;
+      try { style = window.getComputedStyle(el); } catch(e){ continue; }
+
+      var strokeVal = style.stroke;
+      var strokeWidth = parseFloat(style.strokeWidth) || 0;
+      var strokeOpacity = style.strokeOpacity === '' ? 1 : parseFloat(style.strokeOpacity);
+      if (isNaN(strokeOpacity)) strokeOpacity = 1;
+      var hasStroke = strokeVal && strokeVal !== 'none' && strokeWidth > 0 && strokeOpacity > 0;
+
+      var fillVal = style.fill;
+      var fillOpacity = style.fillOpacity === '' ? 1 : parseFloat(style.fillOpacity);
+      if (isNaN(fillOpacity)) fillOpacity = 1;
+      var hasFill = fillVal && fillVal !== 'none' && fillOpacity > 0;
+
+      if (!hasStroke && !hasFill) continue;
+
+      var item = { el: el };
+
+      if (hasStroke){
+        var length;
+        try { length = el.getTotalLength(); } catch(e){ length = 0; }
+        if (!isFinite(length) || length <= 0) length = 10;
+        el.style.strokeDasharray = String(length);
+        el.style.strokeDashoffset = String(length);
+        item.kind = 'stroke';
+        item.length = length;
+        if (hasFill){
+          item.hasFillReveal = true;
+          item.targetFillOpacity = fillOpacity;
+          el.style.fillOpacity = '0';
+        }
+      } else {
+        item.kind = 'fillonly';
+        item.targetFillOpacity = fillOpacity;
+        el.style.fillOpacity = '0';
+      }
+
+      items.push(item);
+    }
+
+    var cursor = 0;
+    var maxEnd = 0;
+    for (var j = 0; j < items.length; j++){
+      var it = items[j];
+      var dur, overlap, start, end;
+
+      if (it.kind === 'stroke'){
+        dur = clamp(it.length * MS_PER_UNIT, MIN_ELEM_MS, MAX_ELEM_MS);
+        overlap = Math.min(MAX_OVERLAP, dur * OVERLAP_RATIO);
+        start = Math.max(0, cursor - overlap);
+        end = start + dur;
+        it.strokeStart = start;
+        it.strokeEnd = end;
+        if (it.hasFillReveal){
+          it.fillStart = end;
+          it.fillEnd = end + FILL_FADE_MS;
+          maxEnd = Math.max(maxEnd, it.fillEnd);
+        } else {
+          maxEnd = Math.max(maxEnd, end);
+        }
+        cursor = end;
+      } else {
+        dur = FILLONLY_MS;
+        overlap = Math.min(MAX_OVERLAP, dur * OVERLAP_RATIO);
+        start = Math.max(0, cursor - overlap);
+        end = start + dur;
+        it.fillStart = start;
+        it.fillEnd = end;
+        maxEnd = Math.max(maxEnd, end);
+        cursor = end;
+      }
+    }
+
+    totalDuration = Math.max(maxEnd, 1);
+    createPenDot(root);
+  }
+
+  function createPenDot(svg){
+    var vb = svg.viewBox && svg.viewBox.baseVal;
+    var refSize = (vb && vb.width && vb.height) ? Math.max(vb.width, vb.height) : 100;
+    var radius = Math.max(0.5, refSize * 0.006);
+
+    penDotEl = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    penDotEl.setAttribute('r', String(radius));
+    penDotEl.setAttribute('fill', '#eba039');
+    penDotEl.style.opacity = '0';
+    penDotEl.style.pointerEvents = 'none';
+    svg.appendChild(penDotEl);
+  }
+
+  /* The dot lives inside the artwork's own coordinate space, so a point found
+     on a path nested in transformed <g> groups (very common in Illustrator
+  /* The dot lives inside the artwork's own coordinate space. A point found on
+     a path nested in transformed <g> groups (very common in Illustrator
+     exports) only makes sense in that path's own local coordinates, so the
+     dot is reparented to be a sibling of the active path rather than
+     converted with a matrix — this can't drift out of sync with the line. */
+  function updatePenDot(pos){
+    if (!penDotEl) return;
+
+    if (!penDotEnabled || (animPhase !== 'draw' && animPhase !== 'outro-undraw')){
+      penDotEl.style.opacity = '0';
+      return;
+    }
+
+    var activeItem = null;
+    for (var i = 0; i < items.length; i++){
+      var it = items[i];
+      if (it.kind !== 'stroke') continue;
+      if (pos >= it.strokeStart && pos < it.strokeEnd) activeItem = it;
+    }
+
+    if (!activeItem){
+      penDotEl.style.opacity = '0';
+      return;
+    }
+
+    var span = (activeItem.strokeEnd - activeItem.strokeStart) || 1;
+    var t = clamp((pos - activeItem.strokeStart) / span, 0, 1);
+    var distance = activeItem.length * easeInOutCubic(t);
+
+    try {
+      var pt = activeItem.el.getPointAtLength(distance);
+
+      /* Move the dot to be a sibling of the currently-drawing element, inside
+         whichever <g> it lives in. That way it shares that element's exact
+         transform stack — cx/cy from getPointAtLength() can be used as-is,
+         with no matrix conversion (and no room for a conversion bug). */
+      var parent = activeItem.el.parentNode;
+      if (parent && penDotEl.parentNode !== parent){
+        parent.appendChild(penDotEl);
+      }
+
+      penDotEl.setAttribute('cx', String(pt.x));
+      penDotEl.setAttribute('cy', String(pt.y));
+      penDotEl.style.opacity = '1';
+    } catch (err){
+      penDotEl.style.opacity = '0';
+    }
+  }
+
+  function render(pos){
+    for (var i = 0; i < items.length; i++){
+      var it = items[i];
+      if (it.kind === 'stroke'){
+        var span = (it.strokeEnd - it.strokeStart) || 1;
+        var t = clamp((pos - it.strokeStart) / span, 0, 1);
+        var e = easeInOutCubic(t);
+        it.el.style.strokeDashoffset = String(it.length * (1 - e));
+        if (it.hasFillReveal){
+          var fspan = (it.fillEnd - it.fillStart) || 1;
+          var ft = clamp((pos - it.fillStart) / fspan, 0, 1);
+          it.el.style.fillOpacity = String(it.targetFillOpacity * easeInOutCubic(ft));
+        }
+      } else {
+        var fspan2 = (it.fillEnd - it.fillStart) || 1;
+        var ft2 = clamp((pos - it.fillStart) / fspan2, 0, 1);
+        it.el.style.fillOpacity = String(it.targetFillOpacity * easeInOutCubic(ft2));
+      }
+    }
+    progressFill.style.width = (totalDuration > 0 ? (pos / totalDuration * 100) : 0) + '%';
+    updateOverlayVisibility();
+    updatePenDot(pos);
+  }
+
+  function tick(ts){
+    if (lastTs === null) lastTs = ts;
+    var dt = ts - lastTs;
+    lastTs = ts;
+
+    if (playing){
+      advancePhase(dt);
+      render(timelinePos);
+
+      if (recording && animPhase !== 'hold') {
+        captureRecordingFrame().then(function(){
+          if (recording && animPhase === 'done') finishRecording();
+        }).catch(function(err){
+          if (recording) failRecording(err);
+        });
+      }
+
+      if (animPhase === 'done'){
+        playing = false;
+        finished = true;
+        updateButtons();
+
+        if (loopEnabled && !recording && svgEl && items.length > 0){
+          resetAnim();
+          playAnim();
+        }
+      }
+    }
+
+    if (playing){
+      rafId = requestAnimationFrame(tick);
+    } else {
+      rafId = null;
+    }
+  }
+
+  function playAnim(){
+    if (!svgEl || items.length === 0) return;
+    if (finished){
+      timelinePos = 0;
+      finished = false;
+      resetPhase();
+    }
+    playing = true;
+    lastTs = null;
+    updateButtons();
+    if (!rafId) rafId = requestAnimationFrame(tick);
+  }
+
+  function pauseAnim(){
+    playing = false;
+    updateButtons();
+  }
+
+  function resetAnim(){
+    playing = false;
+    finished = false;
+    timelinePos = 0;
+    lastTs = null;
+    resetPhase();
+    render(0);
+    updateButtons();
+  }
+
+  function updateButtons(){
+    var hasArt = !!svgEl && items.length > 0;
+    var locked = recording || batchRunning;
+
+    playBtn.disabled = !hasArt || playing || locked;
+    pauseBtn.disabled = !hasArt || !playing || locked;
+    resetBtn.disabled = !hasArt || locked;
+    clearBtn.disabled = locked;
+    exportBtn.disabled = !hasArt || locked || !!pendingVideoBlob;
+
+    playBtn.lastChild.textContent = finished ? ' Replay' : ' Play';
+
+    updateBatchControls();
+  }
+
+  /* ---------------- file loading ---------------- */
+  function showError(msg){
+    errorText.textContent = msg;
+    errorText.hidden = false;
+  }
+  function hideError(){
+    errorText.hidden = true;
+    errorText.textContent = '';
+  }
+
+  function sanitizeSvg(root){
+    var scripts = root.querySelectorAll('script');
+    for (var i = 0; i < scripts.length; i++) scripts[i].remove();
+
+    var all = root.querySelectorAll('*');
+    for (var j = 0; j < all.length; j++){
+      var el = all[j];
+      var attrs = Array.prototype.slice.call(el.attributes);
+      for (var k = 0; k < attrs.length; k++){
+        var name = attrs[k].name.toLowerCase();
+        var value = attrs[k].value || '';
+        if (name.indexOf('on') === 0){
+          el.removeAttribute(attrs[k].name);
+        } else if ((name === 'href' || name === 'xlink:href') && /^\s*javascript:/i.test(value)){
+          el.removeAttribute(attrs[k].name);
+        }
+      }
+    }
+  }
+
+  function resetStage(){
+    if (recording) return;
+    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    svgHost.innerHTML = '';
+    svgEl = null;
+    items = [];
+    penDotEl = null;
+    playing = false;
+    finished = false;
+    timelinePos = 0;
+    lastTs = null;
+    animPhase = 'draw';
+    phaseElapsed = 0;
+    progressFill.style.width = '0%';
+    updateButtons();
+  }
+
+  function clearArtwork(){
+    if (recording) return;
+    resetStage();
+    fileInfo.hidden = true;
+    emptyState.hidden = false;
+    emptyState.style.display = 'flex';
+    hideError();
+    fileInput.value = '';
+  }
+
+  function loadSvgString(text, name){
+    hideError();
+
+    var doc;
+    try {
+      doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    } catch (e){
+      showError('That file could not be parsed as SVG.');
+      return;
+    }
+
+    var parseErr = doc.querySelector('parsererror');
+    if (parseErr){
+      showError("That file doesn't look like a valid SVG.");
+      return;
+    }
+
+    var rawSvg = doc.documentElement;
+    if (!rawSvg || rawSvg.nodeName.toLowerCase() !== 'svg'){
+      showError('No <svg> root element was found in that file.');
+      return;
+    }
+
+    var origWidth = rawSvg.getAttribute('width');
+    var origHeight = rawSvg.getAttribute('height');
+
+    sanitizeSvg(rawSvg);
+    resetStage();
+
+    var imported = document.importNode(rawSvg, true);
+
+    if (!imported.getAttribute('viewBox')){
+      var w = parseFloat(origWidth);
+      var h = parseFloat(origHeight);
+      if (isFinite(w) && isFinite(h) && w > 0 && h > 0){
+        imported.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+      }
+    }
+    imported.removeAttribute('width');
+    imported.removeAttribute('height');
+    if (!imported.getAttribute('preserveAspectRatio')){
+      imported.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    }
+
+    svgHost.appendChild(imported);
+    svgEl = imported;
+
+    buildTimeline(imported);
+
+    var strokeCount = items.filter(function(it){ return it.kind === 'stroke'; }).length;
+    fileNameEl.textContent = name;
+    fileMetaEl.textContent = items.length + ' animated shapes, ' + strokeCount + ' with visible outlines';
+
+    emptyState.hidden = true;
+    emptyState.style.display = 'none';
+    fileInfo.hidden = false;
+
+    render(0);
+    updateButtons();
+  }
+
+  function handleFiles(fileList){
+    if (recording || batchRunning) return;
+    if (!fileList || fileList.length === 0) return;
+    var file = fileList[0];
+    var looksLikeSvg = /\.svg$/i.test(file.name) || file.type === 'image/svg+xml';
+    if (!looksLikeSvg){
+      showError('Please choose a file with an .svg extension.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(){ loadSvgString(String(reader.result), file.name); };
+    reader.onerror = function(){ showError('That file could not be read.'); };
+    reader.readAsText(file);
+  }
+
+  /* ---------------- MP4 / WebM recording ---------------- */
+
+  /* File System Access / Web Share only accept a bare "type/subtype", not
+     "video/webm;codecs=vp9" — strip any parameters before using a MIME type
+     for saving or sharing (recording itself can keep the full string). */
+  function baseMimeType(m){
+    return (m || '').split(';')[0].trim();
+  }
+
+  function chooseRecordingMime(){
+    var candidates = [
+      { mime:'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext:'mp4' },
+      { mime:'video/mp4', ext:'mp4' },
+      { mime:'video/webm;codecs=vp9', ext:'webm' },
+      { mime:'video/webm;codecs=vp8', ext:'webm' },
+      { mime:'video/webm', ext:'webm' }
+    ];
+
+    for (var i = 0; i < candidates.length; i++){
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(candidates[i].mime)){
+        return candidates[i];
+      }
+    }
+    return null;
+  }
+
+  var ASPECT_PRESETS = {
+    '1:1':  { width: 1080, height: 1080 },
+    '4:5':  { width: 1080, height: 1350 },
+    '9:16': { width: 1080, height: 1920 },
+    '16:9': { width: 1920, height: 1080 }
+  };
+
+  /* Purely visual: fits the on-screen canvas box to the selected export
+     ratio so what you see is what you'll get. The export itself always
+     re-reads exportAspect on its own at the moment you click "Export MP4" —
+     this never touches that, so it can't affect a recording in progress. */
+  function applyPreviewAspect(){
+    var preset = ASPECT_PRESETS[exportAspect];
+    if (!preset){
+      canvasWrap.style.width = '';
+      canvasWrap.style.height = '';
+      return;
+    }
+
+    var parent = canvasWrap.parentElement;
+    if (!parent) return;
+
+    var availW = Math.min(parent.clientWidth, 980);
+    var availH = Math.min(parent.clientHeight, 760);
+    if (availW <= 0 || availH <= 0) return;
+
+    var ratio = preset.width / preset.height;
+    var w = availW;
+    var h = w / ratio;
+    if (h > availH){
+      h = availH;
+      w = h * ratio;
+    }
+
+    canvasWrap.style.width = Math.round(w) + 'px';
+    canvasWrap.style.height = Math.round(h) + 'px';
+  }
+
+  /* Shared by the live preview (CSS %) and the export canvas (pixel math) so
+     the two can never drift apart. */
+  function shouldShowOverlayNow(){
+    if (!overlayEnabled || !overlayLoaded) return false;
+    return overlayTiming === 'always' || animPhase !== 'draw';
+  }
+
+  function computeOverlayRect(canvasW, canvasH, naturalW, naturalH){
+    var marginX = canvasW * OVERLAY_MARGIN_PCT;
+    var marginY = canvasH * OVERLAY_MARGIN_PCT;
+    var targetW = canvasW * (overlaySizePct / 100);
+    var ratio = (naturalW && naturalH) ? (naturalH / naturalW) : 1;
+    var targetH = targetW * ratio;
+    var x, y;
+
+    if (overlayPosition === 'top-left'){
+      x = marginX; y = marginY;
+    } else if (overlayPosition === 'top-right'){
+      x = canvasW - targetW - marginX; y = marginY;
+    } else if (overlayPosition === 'bottom-left'){
+      x = marginX; y = canvasH - targetH - marginY;
+    } else if (overlayPosition === 'center'){
+      x = (canvasW - targetW) / 2; y = (canvasH - targetH) / 2;
+    } else { // bottom-right
+      x = canvasW - targetW - marginX; y = canvasH - targetH - marginY;
+    }
+
+    return { x: x, y: y, width: targetW, height: targetH };
+  }
+
+  function applyOverlayPosition(){
+    if (!overlayImg) return;
+    overlayImg.style.width = overlaySizePct + '%';
+    overlayImg.style.height = 'auto';
+    overlayImg.style.top = '';
+    overlayImg.style.bottom = '';
+    overlayImg.style.left = '';
+    overlayImg.style.right = '';
+    overlayImg.style.transform = '';
+
+    var marginPct = (OVERLAY_MARGIN_PCT * 100) + '%';
+
+    if (overlayPosition === 'top-left'){
+      overlayImg.style.top = marginPct;
+      overlayImg.style.left = marginPct;
+    } else if (overlayPosition === 'top-right'){
+      overlayImg.style.top = marginPct;
+      overlayImg.style.right = marginPct;
+    } else if (overlayPosition === 'bottom-left'){
+      overlayImg.style.bottom = marginPct;
+      overlayImg.style.left = marginPct;
+    } else if (overlayPosition === 'center'){
+      overlayImg.style.top = '50%';
+      overlayImg.style.left = '50%';
+      overlayImg.style.transform = 'translate(-50%, -50%)';
+    } else { // bottom-right
+      overlayImg.style.bottom = marginPct;
+      overlayImg.style.right = marginPct;
+    }
+  }
+
+  function updateOverlayVisibility(){
+    if (!overlayImg) return;
+    if (!overlayEnabled || !overlayLoaded){
+      overlayImg.style.display = 'none';
+      overlayImg.classList.remove('visible');
+      return;
+    }
+    overlayImg.style.display = 'block';
+    overlayImg.classList.toggle('visible', shouldShowOverlayNow());
+  }
+
+  function loadOverlayImage(file){
+    overlayErrorText.hidden = true;
+    overlayErrorText.textContent = '';
+
+    var reader = new FileReader();
+    reader.onload = function(){
+      var dataUrl = String(reader.result);
+      var testImg = new Image();
+      testImg.onload = function(){
+        if (!testImg.naturalWidth || !testImg.naturalHeight){
+          overlayErrorText.textContent = 'This image has no readable size — try a PNG/JPG, or add width/height to the SVG.';
+          overlayErrorText.hidden = false;
+          return;
+        }
+        overlayImg.src = dataUrl;
+        overlayLoaded = true;
+        overlayFileName.textContent = file.name;
+        overlayFileInfo.hidden = false;
+        applyOverlayPosition();
+        updateOverlayVisibility();
+      };
+      testImg.onerror = function(){
+        overlayErrorText.textContent = 'That file could not be read as an image.';
+        overlayErrorText.hidden = false;
+      };
+      testImg.src = dataUrl;
+    };
+    reader.onerror = function(){
+      overlayErrorText.textContent = 'That file could not be read.';
+      overlayErrorText.hidden = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function getSvgSize(){
+    var preset = ASPECT_PRESETS[exportAspect];
+    if (preset) return { width: preset.width, height: preset.height };
+
+    var rect = svgEl.getBoundingClientRect();
+    var width = Math.max(2, Math.round(canvasWrap.clientWidth || rect.width || 1280));
+    var height = Math.max(2, Math.round(canvasWrap.clientHeight || rect.height || 720));
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    return {
+      width: Math.max(2, Math.round(width * dpr)),
+      height: Math.max(2, Math.round(height * dpr))
+    };
+  }
+
+  function drawRecordingBackground(ctx, width, height){
+    var bg = canvasWrap.classList.contains('bg-white') ? 'white' :
+             canvasWrap.classList.contains('bg-grid') ? 'grid' : canvasWrap.classList.contains('bg-custom') ? 'custom' : 'transparent';
+
+    if (bg === 'white'){
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+    } else if (bg === 'grid'){
+      ctx.fillStyle = '#1c1f24';
+      ctx.fillRect(0, 0, width, height);
+
+      /* A fixed export ratio has no on-screen canvas of its own to match, so
+         fall back to the output width itself as the reference for spacing. */
+      var refWidth = ASPECT_PRESETS[exportAspect] ? width : Math.max(1, canvasWrap.clientWidth);
+      var scale = width / refWidth;
+      var step = Math.max(2, Math.round(26 * scale));
+      ctx.strokeStyle = 'rgba(255,255,255,.07)';
+      ctx.lineWidth = Math.max(1, scale);
+      for (var x = 0; x <= width; x += step){
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+      }
+      for (var y = 0; y <= height; y += step){
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+      }
+    } else if (bg === 'custom'){
+      ctx.fillStyle = customBgColor;
+      ctx.fillRect(0, 0, width, height);
+    } else {
+      ctx.clearRect(0, 0, width, height);
+    }
+  }
+
+  function serializeSvgForRecording(){
+    var clone = svgEl.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+    /* Make the exported SVG fill the recording image without relying on CSS layout. */
+    clone.removeAttribute('width');
+    clone.removeAttribute('height');
+    clone.setAttribute('width', '100%');
+    clone.setAttribute('height', '100%');
+
+    return new XMLSerializer().serializeToString(clone);
+  }
+
+  function captureRecordingFrame(){
+    if (!recording || !recordingCanvas || !recordingCtx || recordingFrameBusy) {
+      return Promise.resolve();
+    }
+
+    recordingFrameBusy = true;
+
+    return new Promise(function(resolve, reject){
+      try {
+        var svgText = serializeSvgForRecording();
+        var svgBlob = new Blob([svgText], { type:'image/svg+xml;charset=utf-8' });
+        var url = URL.createObjectURL(svgBlob);
+        var img = new Image();
+
+        img.onload = function(){
+          try {
+            var ctx = recordingCtx;
+            var w = recordingCanvas.width;
+            var h = recordingCanvas.height;
+
+            drawRecordingBackground(ctx, w, h);
+
+            /*
+             * The visible SVG is contained inside a 90% host. Reproduce that
+             * contain-style layout in the recording canvas.
+             */
+            var padX = w * 0.05;
+            var padY = h * 0.05;
+            var targetW = w - padX * 2;
+            var targetH = h - padY * 2;
+            var sourceRatio = img.naturalWidth && img.naturalHeight
+              ? img.naturalWidth / img.naturalHeight
+              : (svgEl.viewBox && svgEl.viewBox.baseVal.height
+                ? svgEl.viewBox.baseVal.width / svgEl.viewBox.baseVal.height
+                : targetW / targetH);
+            var targetRatio = targetW / targetH;
+            var drawW, drawH, dx, dy;
+
+            if (sourceRatio > targetRatio){
+              drawW = targetW;
+              drawH = targetW / sourceRatio;
+              dx = padX;
+              dy = (h - drawH) / 2;
+            } else {
+              drawH = targetH;
+              drawW = targetH * sourceRatio;
+              dx = (w - drawW) / 2;
+              dy = padY;
+            }
+
+            ctx.drawImage(img, dx, dy, drawW, drawH);
+
+            if (shouldShowOverlayNow() && overlayImg.naturalWidth && overlayImg.naturalHeight){
+              var rect = computeOverlayRect(w, h, overlayImg.naturalWidth, overlayImg.naturalHeight);
+              ctx.drawImage(overlayImg, rect.x, rect.y, rect.width, rect.height);
+            }
+
+            URL.revokeObjectURL(url);
+            recordingFrameBusy = false;
+            resolve();
+          } catch (err) {
+            URL.revokeObjectURL(url);
+            recordingFrameBusy = false;
+            reject(err);
+          }
+        };
+
+        img.onerror = function(){
+          URL.revokeObjectURL(url);
+          recordingFrameBusy = false;
+          reject(new Error('The SVG frame could not be rendered for recording.'));
+        };
+
+        img.src = url;
+      } catch (err) {
+        recordingFrameBusy = false;
+        reject(err);
+      }
+    });
+  }
+
+  /*
+   * showSaveFilePicker() and navigator.share() both require "transient user
+   * activation" — a click that happened moments ago. The Export click no
+   * longer counts by the time a 10-30 second recording finishes, so instead
+   * of saving automatically here, we stash the finished blob and show a
+   * "Video ready" banner. The Save/Share button on that banner is a brand
+   * new click, so the save APIs work reliably from there.
+   */
+  function presentVideoReady(blob){
+    var filenameBase = (fileNameEl.textContent || 'svg-animation')
+      .replace(/\.svg$/i, '')
+      .replace(/[^\w\-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'svg-animation';
+
+    var extension = recordingExtension;
+    var mime = baseMimeType(blob.type) || (extension === 'mp4' ? 'video/mp4' : 'video/webm');
+    var filename = filenameBase + '.' + extension;
+
+    if (batchRunning){
+      var currentIndex = batchIndex;
+      downloadBlobDirectly(blob, filename).then(function(){
+        if (currentIndex >= 0 && currentIndex < batchQueue.length){
+          batchQueue[currentIndex].status = 'done';
+          renderBatchQueue();
+        }
+      }, function(){
+        if (currentIndex >= 0 && currentIndex < batchQueue.length){
+          batchQueue[currentIndex].status = 'error';
+          batchQueue[currentIndex].errorMsg = 'Could not download';
+          renderBatchQueue();
+        }
+      }).then(function(){
+        processNextBatchItem();
+      });
+      return;
+    }
+
+    pendingVideoExtension = extension;
+    pendingVideoMime = mime;
+    pendingVideoFilename = filename;
+    pendingVideoBlob = blob;
+
+    videoReadySaveBtn.textContent = pickSaveLabel();
+    videoReadyBanner.classList.add('visible');
+  }
+
+  function canShareVideo(){
+    if (!pendingVideoBlob || !navigator.share || !navigator.canShare) return false;
+    try {
+      var testFile = new File([pendingVideoBlob], pendingVideoFilename || 'video', { type: pendingVideoMime });
+      return navigator.canShare({ files: [testFile] });
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function pickSaveLabel(){
+    if (window.showSaveFilePicker) return 'Save video';
+    if (canShareVideo()) return 'Share / Save video';
+    return 'Download video';
+  }
+
+  function discardPendingVideo(){
+    pendingVideoBlob = null;
+    pendingVideoFilename = '';
+    pendingVideoMime = '';
+    videoReadyBanner.classList.remove('visible');
+    updateButtons();
+  }
+
+  function downloadBlobDirectly(blob, filename){
+    return new Promise(function(resolve, reject){
+      try {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.rel = 'noopener';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function(){
+          URL.revokeObjectURL(url);
+          resolve();
+        }, 1500);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  function finalizeSaveVideo(){
+    if (!pendingVideoBlob) return;
+
+    var blob = pendingVideoBlob;
+    var filename = pendingVideoFilename;
+    var mime = pendingVideoMime;
+    var ext = pendingVideoExtension;
+
+    var savePromise = null;
+
+    if (window.showSaveFilePicker){
+      savePromise = window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: ext === 'mp4' ? 'MP4 video' : 'WebM video',
+          accept: (function(){ var o = {}; o[mime] = ['.' + ext]; return o; })()
+        }]
+      }).then(function(handle){
+        return handle.createWritable().then(function(writable){
+          return writable.write(blob).then(function(){ return writable.close(); });
+        });
+      });
+    } else {
+      var videoFile = null;
+      try { videoFile = new File([blob], filename, { type: mime }); } catch (err) { videoFile = null; }
+
+      if (videoFile && navigator.share && navigator.canShare){
+        var canShareFiles = false;
+        try { canShareFiles = navigator.canShare({ files: [videoFile] }); } catch (err) { canShareFiles = false; }
+        if (canShareFiles){
+          savePromise = navigator.share({ files: [videoFile], title: 'SVG Animation' });
+        }
+      }
+
+      if (!savePromise){
+        savePromise = downloadBlobDirectly(blob, filename);
+      }
+    }
+
+    savePromise.then(function(){
+      /* Saved (or shared) successfully — the video no longer needs to be kept around. */
+      pendingVideoBlob = null;
+      pendingVideoFilename = '';
+      pendingVideoMime = '';
+      videoReadyBanner.classList.remove('visible');
+      hideError();
+      updateButtons();
+    }).catch(function(err){
+      /* Closing the Share Sheet or save dialog is a deliberate cancellation —
+         keep the video available so the user can simply try again. */
+      if (err && err.name === 'AbortError') return;
+      showError('The video could not be saved. It is still available above — try again.');
+    });
+  }
+
+  function cleanupRecording(){
+    if (recordingStream){
+      recordingStream.getTracks().forEach(function(track){ track.stop(); });
+    }
+    recordingStream = null;
+    recordingCanvas = null;
+    recordingCtx = null;
+    mediaRecorder = null;
+    recordingChunks = [];
+    recordingFrameBusy = false;
+    recordingStopRequested = false;
+    recordingCancelRequested = false;
+    recordingFailRequested = false;
+  }
+
+  function finishRecording(){
+    if (!recording || recordingStopRequested) return;
+    recordingStopRequested = true;
+
+    if (mediaRecorder && mediaRecorder.state !== 'inactive'){
+      mediaRecorder.stop();
+    }
+  }
+
+  function cancelRecording(){
+    if (!recording) return;
+
+    if (batchRunning){
+      batchRunning = false;
+      if (batchIndex >= 0 && batchIndex < batchQueue.length){
+        batchQueue[batchIndex].status = 'error';
+        batchQueue[batchIndex].errorMsg = 'Cancelled';
+      }
+      batchIndex = -1;
+      renderBatchQueue();
+    }
+
+    recordingCancelRequested = true;
+    recordingStopRequested = true;
+    pauseAnim();
+
+    if (mediaRecorder && mediaRecorder.state !== 'inactive'){
+      try { mediaRecorder.stop(); } catch(e) {}
+    } else {
+      recording = false;
+      recordingBanner.classList.remove('visible');
+      cleanupRecording();
+      updateButtons();
+    }
+  }
+
+  function failRecording(err){
+    if (!recording) return;
+
+    recordingFailRequested = true;
+    recordingStopRequested = true;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive'){
+      try { mediaRecorder.stop(); } catch(e) {}
+    }
+
+    var message = (err && err.message) ? err.message : 'The video could not be recorded.';
+    setTimeout(function(){
+      recording = false;
+      recordingBanner.classList.remove('visible');
+      cleanupRecording();
+      updateButtons();
+      showError(message);
+    }, 0);
+  }
+
+  /* ---------------- batch export ---------------- */
+  function addFilesToBatch(fileList){
+    if (batchRunning || !fileList) return;
+    for (var i = 0; i < fileList.length; i++){
+      var file = fileList[i];
+      var looksLikeSvg = /\.svg$/i.test(file.name) || file.type === 'image/svg+xml';
+      if (!looksLikeSvg) continue;
+      batchQueue.push({ file: file, status: 'queued', errorMsg: '' });
+    }
+    renderBatchQueue();
+  }
+
+  function statusLabel(item){
+    if (item.status === 'queued') return 'Queued';
+    if (item.status === 'processing') return 'Exporting…';
+    if (item.status === 'done') return 'Done';
+    if (item.status === 'error') return item.errorMsg || 'Failed';
+    return '';
+  }
+
+  function renderBatchQueue(){
+    batchList.innerHTML = '';
+    batchList.hidden = batchQueue.length === 0;
+
+    batchQueue.forEach(function(item, idx){
+      var row = document.createElement('div');
+      row.className = 'batch-item status-' + item.status;
+
+      var name = document.createElement('span');
+      name.className = 'batch-name';
+      name.textContent = item.file.name;
+      row.appendChild(name);
+
+      var status = document.createElement('span');
+      status.className = 'batch-status';
+      status.textContent = statusLabel(item);
+      row.appendChild(status);
+
+      if (item.status === 'queued' && !batchRunning){
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'batch-item-remove';
+        removeBtn.setAttribute('aria-label', 'Remove from queue');
+        removeBtn.textContent = '✕';
+        removeBtn.addEventListener('click', function(){
+          batchQueue.splice(idx, 1);
+          renderBatchQueue();
+          updateBatchControls();
+        });
+        row.appendChild(removeBtn);
+      }
+
+      batchList.appendChild(row);
+    });
+
+    updateBatchProgressText();
+    updateBatchControls();
+  }
+
+  function updateBatchProgressText(){
+    if (!batchRunning){
+      batchProgressText.textContent = '';
+      return;
+    }
+    batchProgressText.textContent = 'Exporting ' + Math.min(batchIndex + 1, batchQueue.length) + ' of ' + batchQueue.length + '…';
+  }
+
+  function updateBatchControls(){
+    batchStartBtn.disabled = batchRunning || batchQueue.length === 0 || recording || !!pendingVideoBlob;
+    batchClearBtn.disabled = batchRunning || batchQueue.length === 0;
+    batchAddBtn.disabled = batchRunning;
+  }
+
+  function clearBatchQueue(){
+    if (batchRunning) return;
+    batchQueue = [];
+    renderBatchQueue();
+  }
+
+  function loadSvgFileForBatch(file){
+    return new Promise(function(resolve, reject){
+      var looksLikeSvg = /\.svg$/i.test(file.name) || file.type === 'image/svg+xml';
+      if (!looksLikeSvg){
+        reject(new Error('Not an SVG file'));
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(){
+        loadSvgString(String(reader.result), file.name);
+        if (svgEl && items.length > 0){
+          resolve();
+        } else {
+          reject(new Error(errorText.hidden ? 'Could not load this SVG' : errorText.textContent));
+        }
+      };
+      reader.onerror = function(){ reject(new Error('Could not read this file')); };
+      reader.readAsText(file);
+    });
+  }
+
+  function startBatch(){
+    if (batchRunning || batchQueue.length === 0 || recording || pendingVideoBlob) return;
+    batchQueue.forEach(function(item){
+      if (item.status !== 'queued') { item.status = 'queued'; item.errorMsg = ''; }
+    });
+    batchRunning = true;
+    batchIndex = -1;
+    renderBatchQueue();
+    updateButtons();
+    processNextBatchItem();
+  }
+
+  function finishBatch(){
+    batchRunning = false;
+    batchIndex = -1;
+    renderBatchQueue();
+    updateButtons();
+  }
+
+  function processNextBatchItem(){
+    batchIndex++;
+    if (!batchRunning || batchIndex >= batchQueue.length){
+      finishBatch();
+      return;
+    }
+
+    var item = batchQueue[batchIndex];
+    item.status = 'processing';
+    renderBatchQueue();
+
+    loadSvgFileForBatch(item.file).then(function(){
+      exportVideo();
+      if (!recording){
+        item.status = 'error';
+        item.errorMsg = errorText.hidden ? 'Could not start export' : errorText.textContent;
+        renderBatchQueue();
+        processNextBatchItem();
+      }
+    }, function(err){
+      item.status = 'error';
+      item.errorMsg = (err && err.message) || 'Could not load this file';
+      renderBatchQueue();
+      processNextBatchItem();
+    });
+  }
+
+  function exportVideo(){
+    if (recording || pendingVideoBlob || !svgEl || items.length === 0) return;
+
+    hideError();
+
+    if (!window.MediaRecorder){
+      showError('Video recording is not supported by this browser.');
+      return;
+    }
+
+    var selected = chooseRecordingMime();
+    if (!selected){
+      showError('This browser does not support MP4 or WebM MediaRecorder output.');
+      return;
+    }
+
+    var canvasSize = getSvgSize();
+    recordingCanvas = document.createElement('canvas');
+    recordingCanvas.width = canvasSize.width;
+    recordingCanvas.height = canvasSize.height;
+    recordingCtx = recordingCanvas.getContext('2d', { alpha:true });
+
+    if (!recordingCtx){
+      showError('Could not create the recording canvas.');
+      cleanupRecording();
+      return;
+    }
+
+    var fps = 60;
+    try {
+      recordingStream = recordingCanvas.captureStream(fps);
+    } catch (err) {
+      showError('This browser cannot capture the canvas for video recording.');
+      cleanupRecording();
+      return;
+    }
+
+    recordingMime = selected.mime;
+    recordingExtension = selected.ext;
+    recordingChunks = [];
+    recordingCancelRequested = false;
+    recording = true;
+    recordingBanner.classList.add('visible');
+    updateButtons();
+
+    try {
+      mediaRecorder = new MediaRecorder(recordingStream, {
+        mimeType: recordingMime,
+        videoBitsPerSecond: 8 * 1000 * 1000
+      });
+    } catch (err) {
+      recording = false;
+      recordingBanner.classList.remove('visible');
+      cleanupRecording();
+      showError('The browser could not start video recording.');
+      updateButtons();
+      return;
+    }
+
+    mediaRecorder.ondataavailable = function(e){
+      if (e.data && e.data.size > 0) recordingChunks.push(e.data);
+    };
+
+    mediaRecorder.onerror = function(e){
+      failRecording(e.error || new Error('Video recording failed.'));
+    };
+
+    mediaRecorder.onstop = function(){
+      if (recordingCancelRequested || recordingFailRequested){
+        var wasFailure = recordingFailRequested;
+        recording = false;
+        recordingBanner.classList.remove('visible');
+        cleanupRecording();
+        updateButtons();
+        if (recordingCancelRequested) hideError();
+
+        if (wasFailure && batchRunning){
+          if (batchIndex >= 0 && batchIndex < batchQueue.length){
+            batchQueue[batchIndex].status = 'error';
+            batchQueue[batchIndex].errorMsg = 'Recording failed';
+            renderBatchQueue();
+          }
+          processNextBatchItem();
+        }
+        return;
+      }
+
+      var blob = new Blob(recordingChunks, {
+        type: recordingMime || (recordingExtension === 'mp4' ? 'video/mp4' : 'video/webm')
+      });
+
+      recording = false;
+      recordingBanner.classList.remove('visible');
+      cleanupRecording();
+      presentVideoReady(blob);
+      updateButtons();
+    };
+
+    /* Reset to 0%, then capture the first frame before playback begins. */
+    resetAnim();
+
+    captureRecordingFrame().then(function(){
+      if (!recording) return;
+      mediaRecorder.start(100);
+      playAnim();
+    }).catch(function(err){
+      failRecording(err);
+    });
+  }
+
+  /* ---------------- upload interactions ---------------- */
+  browseBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if (recording) return;
+    fileInput.click();
+  });
+  dropzone.addEventListener('click', function(e){
+    if (recording) return;
+    if (e.target.closest('#browseBtn')) return;
+    fileInput.click();
+  });
+  dropzone.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+  fileInput.addEventListener('change', function(e){
+    if (recording) return;
+    handleFiles(e.target.files);
+  });
+  clearBtn.addEventListener('click', clearArtwork);
+
+  ['dragenter', 'dragover'].forEach(function(evt){
+    dropzone.addEventListener(evt, function(e){
+      e.preventDefault(); e.stopPropagation();
+      dropzone.classList.add('drag-over');
+    });
+    canvasWrap.addEventListener(evt, function(e){
+      e.preventDefault(); e.stopPropagation();
+      canvasWrap.classList.add('drag-over');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function(evt){
+    dropzone.addEventListener(evt, function(e){
+      e.preventDefault(); e.stopPropagation();
+      dropzone.classList.remove('drag-over');
+    });
+    canvasWrap.addEventListener(evt, function(e){
+      e.preventDefault(); e.stopPropagation();
+      canvasWrap.classList.remove('drag-over');
+    });
+  });
+  dropzone.addEventListener('drop', function(e){ if (!recording) handleFiles(e.dataTransfer.files); });
+  canvasWrap.addEventListener('drop', function(e){ if (!recording) handleFiles(e.dataTransfer.files); });
+
+  /* Tap-to-replay: in clean view (kiosk/tablet demo use) there's no sidebar to
+     reach, so tapping the artwork itself restarts the drawing from the start. */
+  canvasWrap.addEventListener('click', function(){
+    if (!appEl.classList.contains('clean-view')) return;
+    if (recording || !svgEl || items.length === 0) return;
+    resetAnim();
+    playAnim();
+  });
+
+  /* ---------------- playback controls ---------------- */
+  playBtn.addEventListener('click', playAnim);
+  pauseBtn.addEventListener('click', pauseAnim);
+  resetBtn.addEventListener('click', resetAnim);
+  exportBtn.addEventListener('click', exportVideo);
+  recordingCancelBtn.addEventListener('click', cancelRecording);
+
+  batchAddBtn.addEventListener('click', function(){
+    batchFileInput.click();
+  });
+  batchFileInput.addEventListener('change', function(e){
+    addFilesToBatch(e.target.files);
+    batchFileInput.value = '';
+  });
+  batchStartBtn.addEventListener('click', startBatch);
+  batchClearBtn.addEventListener('click', clearBatchQueue);
+  videoReadySaveBtn.addEventListener('click', finalizeSaveVideo);
+  videoReadyDismissBtn.addEventListener('click', discardPendingVideo);
+
+  speedSlider.addEventListener('input', function(){
+    speed = parseFloat(speedSlider.value);
+    speedValue.textContent = speed.toFixed(2);
+  });
+
+  holdSlider.addEventListener('input', function(){
+    holdMs = parseInt(holdSlider.value, 10) || 0;
+    holdValue.textContent = (holdMs / 1000).toFixed(1);
+  });
+
+  endModeToggle.addEventListener('click', function(e){
+    var btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    endMode = btn.getAttribute('data-end');
+    var siblings = endModeToggle.querySelectorAll('.seg-btn');
+    for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('active');
+    btn.classList.add('active');
+  });
+
+  aspectToggle.addEventListener('click', function(e){
+    var btn = e.target.closest('.chip');
+    if (!btn) return;
+    exportAspect = btn.getAttribute('data-aspect');
+    var siblings = aspectToggle.querySelectorAll('.chip');
+    for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('active');
+    btn.classList.add('active');
+    applyPreviewAspect();
+  });
+
+  window.addEventListener('resize', applyPreviewAspect);
+
+  overlayToggle.addEventListener('change', function(){
+    overlayEnabled = overlayToggle.checked;
+    overlayControls.hidden = !overlayEnabled;
+    updateOverlayVisibility();
+  });
+
+  penDotToggle.addEventListener('change', function(){
+    penDotEnabled = penDotToggle.checked;
+    render(timelinePos);
+  });
+
+  overlayBrowseBtn.addEventListener('click', function(){
+    overlayFileInput.click();
+  });
+
+  overlayFileInput.addEventListener('change', function(e){
+    var file = e.target.files && e.target.files[0];
+    if (file) loadOverlayImage(file);
+  });
+
+  overlayClearBtn.addEventListener('click', function(){
+    overlayLoaded = false;
+    overlayImg.removeAttribute('src');
+    overlayFileInfo.hidden = true;
+    overlayFileInput.value = '';
+    updateOverlayVisibility();
+  });
+
+  overlayPositionToggle.addEventListener('click', function(e){
+    var btn = e.target.closest('.chip');
+    if (!btn) return;
+    overlayPosition = btn.getAttribute('data-pos');
+    var siblings = overlayPositionToggle.querySelectorAll('.chip');
+    for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('active');
+    btn.classList.add('active');
+    applyOverlayPosition();
+  });
+
+  overlaySizeSlider.addEventListener('input', function(){
+    overlaySizePct = parseInt(overlaySizeSlider.value, 10) || 14;
+    overlaySizeValue.textContent = String(overlaySizePct);
+    applyOverlayPosition();
+  });
+
+  overlayTimingToggle.addEventListener('click', function(e){
+    var btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    overlayTiming = btn.getAttribute('data-timing');
+    var siblings = overlayTimingToggle.querySelectorAll('.seg-btn');
+    for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('active');
+    btn.classList.add('active');
+    updateOverlayVisibility();
+  });
+
+  /* ---------------- background toggle ---------------- */
+  function isValidHex(value){ return /^#[0-9A-Fa-f]{6}$/.test(value); }
+
+  function setCustomBackground(value){
+    if (!isValidHex(value)) return false;
+    customBgColor = value.toUpperCase();
+    customColorPicker.value = customBgColor;
+    customHexInput.value = customBgColor;
+    canvasWrap.style.backgroundColor = customBgColor;
+    return true;
+  }
+
+  function setHueFromColor(hex){
+    var r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+    var max=Math.max(r,g,b), min=Math.min(r,g,b), h=0;
+    if(max!==min){ var d=max-min; if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4; h=Math.round(h*60); if(h<0) h+=360; }
+    customHueSlider.value=h;
+  }
+
+  bgToggle.addEventListener('click', function(e){
+    var btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    var mode = btn.getAttribute('data-bg');
+    canvasWrap.classList.remove('bg-white', 'bg-grid', 'bg-transparent', 'bg-custom');
+    canvasWrap.classList.add('bg-' + mode);
+    if (mode === 'custom'){
+      customBgControls.classList.add('visible');
+      canvasWrap.style.backgroundColor = customBgColor;
+    } else {
+      customBgControls.classList.remove('visible');
+      canvasWrap.style.backgroundColor = '';
+    }
+    var siblings = bgToggle.querySelectorAll('.seg-btn');
+    for (var i = 0; i < siblings.length; i++) siblings[i].classList.remove('active');
+    btn.classList.add('active');
+  });
+
+  customColorPicker.addEventListener('input', function(){ setCustomBackground(customColorPicker.value); setHueFromColor(customColorPicker.value); });
+  customHexInput.addEventListener('input', function(){ var value=customHexInput.value.trim(); if(value.charAt(0)!=='#') value='#'+value; if(isValidHex(value)) { setCustomBackground(value); setHueFromColor(value); } });
+  customHexInput.addEventListener('blur', function(){ var value=customHexInput.value.trim(); if(value.charAt(0)!=='#') value='#'+value; if(!isValidHex(value)) customHexInput.value=customBgColor; });
+  customHueSlider.addEventListener('input', function(){
+    var h=Number(customHueSlider.value), s=0.65, l=0.55; var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2; var r=0,g=0,b=0;
+    if(h<60){r=c;g=x;} else if(h<120){r=x;g=c;} else if(h<180){g=c;b=x;} else if(h<240){g=x;b=c;} else if(h<300){r=x;b=c;} else {r=c;b=x;}
+    var hex='#'+[r,g,b].map(function(v){return Math.round((v+m)*255).toString(16).padStart(2,'0');}).join(''); setCustomBackground(hex);
+  });
+  setCustomBackground(customBgColor);
+
+  /* ---------------- clean / presentation view ---------------- */
+  var hideTimer = null;
+
+  function requestFs(el){
+    var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (fn) { try { fn.call(el); } catch(e){ /* ignore */ } }
+  }
+  function exitFs(){
+    var fn = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+    if (fn && (document.fullscreenElement || document.webkitFullscreenElement)) {
+      try { fn.call(document); } catch(e){ /* ignore */ }
+    }
+  }
+
+  function showExitPill(){
+    exitCleanBtn.classList.add('visible');
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(function(){ exitCleanBtn.classList.remove('visible'); }, 2200);
+  }
+
+  function enterCleanView(){
+    appEl.classList.add('clean-view');
+    requestFs(document.documentElement);
+    showExitPill();
+    applyPreviewAspect();
+  }
+
+  function exitCleanView(){
+    appEl.classList.remove('clean-view');
+    exitCleanBtn.classList.remove('visible');
+    exitFs();
+    applyPreviewAspect();
+  }
+
+  cleanViewBtn.addEventListener('click', enterCleanView);
+  exitCleanBtn.addEventListener('click', exitCleanView);
+
+  loopToggle.addEventListener('change', function(){
+    loopEnabled = loopToggle.checked;
+  });
+
+  stage.addEventListener('mousemove', function(){
+    if (appEl.classList.contains('clean-view')) showExitPill();
+  });
+
+  document.addEventListener('fullscreenchange', function(){
+    var stillFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (!stillFs && appEl.classList.contains('clean-view')){
+      appEl.classList.remove('clean-view');
+      exitCleanBtn.classList.remove('visible');
+    }
+    applyPreviewAspect();
+  });
+
+  /* ---------------- keyboard shortcuts ---------------- */
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){
+      if (appEl.classList.contains('clean-view')) exitCleanView();
+      return;
+    }
+    var tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    if (recording) return;
+
+    if (e.code === 'Space'){
+      e.preventDefault();
+      if (playing) pauseAnim(); else playAnim();
+    } else if (e.key === 'r' || e.key === 'R'){
+      resetAnim();
+    } else if (e.key === 'f' || e.key === 'F'){
+      if (appEl.classList.contains('clean-view')) exitCleanView(); else enterCleanView();
+    }
+  });
+
+  /* ---------------- viewport / mobile ---------------- */
+  function refreshViewport(){
+    if (window.visualViewport && window.visualViewport.height){
+      document.documentElement.style.setProperty('--viewport-height', window.visualViewport.height + 'px');
+    }
+  }
+  window.addEventListener('resize', refreshViewport, { passive:true });
+  if (window.visualViewport){
+    window.visualViewport.addEventListener('resize', refreshViewport, { passive:true });
+  }
+  refreshViewport();
+
+  /* ---------------- init ---------------- */
+  emptyState.hidden = false;
+  emptyState.style.display = 'flex';
+  applyOverlayPosition();
+  updateOverlayVisibility();
+  renderBatchQueue();
+  updateButtons();
+})();
+</script>
+
+</body>
+</html>
